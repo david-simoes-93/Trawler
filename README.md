@@ -16,4 +16,8 @@ Or use options
 
     ./Trawler https://www.mangareader.net/soul-eater --no-compress --start 1 --end 100 --save /tmp
 
+Or use options
+
+    ./Trawler https://www.readmng.com/dragon-ball/ --no-compress --start 277
+
 
