@@ -23,8 +23,6 @@
 #define std_literals std::experimental::literals
 #endif
 
-#include "Trip.h"
-
 using namespace std_literals;
 
 
@@ -92,19 +90,19 @@ int main(int argc, char *argv[]) {
     }
 
     std::string mangaLink = std::string(argv[1]);
-    bool mangareader_link = mangaLink.find("mangareader") < mangaLink.size();
-    if (!mangareader_link) {
-        bool readmng_link = mangaLink.find("readmng") < mangaLink.size();
-        if (!readmng_link) {
-            showHelp();
-            return 0;
-        }
+
+    bool mangareader_link = mangaLink.find("mangareader") != std::string::npos;
+    bool readmng_link = mangaLink.find("readmng") != std::string::npos;
+    if (!mangareader_link && !readmng_link) {
+        showHelp();
+        return 0;
     }
 
     bool compress = true;
-    uint32_t startChapter = 1;
-    uint32_t endChapter = 9999; // std::numeric_limits<uint32_t>::max();
-    std::string saveDir = boost::filesystem::current_path().string();
+    uint32_t startChapter {1};
+    uint32_t endChapter {9999}; // std::numeric_limits<uint32_t>::max();
+    std::string saveDir {boost::filesystem::current_path().string()};
+    std::string ddos_cf_clearance {""};
 
     for (uint8_t argIndex = 2; argIndex < argc; ++argIndex) {
         if (argv[argIndex] == "--no-compress"sv) {
@@ -117,12 +115,24 @@ int main(int argc, char *argv[]) {
             endChapter = std::min(std::atoi(argv[argIndex]), 9999);
         } else if (argv[argIndex] == "--save"sv) {
             argIndex++;
-            std::string saveDir = std::string(argv[argIndex]);
+            saveDir = std::string(argv[argIndex]);
+        } else if (argv[argIndex] == "--ddos"sv) {
+            argIndex++;
+            ddos_cf_clearance = std::string(argv[argIndex]);
         } else {
             showHelp();
             return 0;
         }
     }
+
+    std::string cookies {"Cookie: __cfduid=dce7d571085ddb5906dd36bb8bfcff9551580944641; "
+            "ci_session=iRJr2RsPUVUcrzgqyXq6MFYlGuRCY1n8TNBWS8JWB%2BCNiQb752rGMUFI4bj4SmbQh333iG3%2BGcx4zMZa1SLMt0uatOIgBjWgdcXbIrK8GCu5robNWUH1LcY3QyYo0DM43OHa5%2BD%2BkYVTjaB2YfnYlRzBCGkX7B1o4H7jFmKNqpSsyXeL7XfKAg9UzzhHjzGsPt28rQc%2BJacuZj3s30pRKMv9KK9A5HV5VtPqKe955ZEyyvnmVVeTocNy8DZMDIbGScoo0PWD7E0YvyJV5AUxX6P23s%2B83GuBPi0cTcIG2LB%2FBf1YViP8GIUbAtq4luMFYJLLsQOQN03UX3QwCKv6loTj%2FIFwUN%2BBB0zbtxfGtj8VScKycVUgKThQapKR8EhxC%2Fq12QEkl2bXsqWszfW0pXyqEn7sOqZQzjYRy9oDc2w%3D; "
+            "_ga=GA1.2.257006594.1580944644; "
+            "_gid=GA1.2.1622360435.1580944644; "
+            "OB-USER-TOKEN=3c134b0f-d2dd-4220-83e6-430ba7ce9d37; "
+            "_awl=2.1580945930.0.4-6a365285-a98b5de77a6c926b649cf7751b68ee68-6763652d6575726f70652d7765737431-5e3b520a-1; "
+            "cf_clearance="+ddos_cf_clearance};
+    std::string userAgent {"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"};
 
     // Create save directory
     boost::filesystem::create_directory(saveDir);
@@ -141,8 +151,6 @@ int main(int argc, char *argv[]) {
         std::string chapterDir = saveDir + "/" + std::string(currChapterStr) + "/";
         boost::filesystem::create_directory(chapterDir);
 
-        // TODO handle timeout crash
-
         // crawl each page, up to one thousand
         uint16_t currPage = 1;
         while (currPage < 1000) {
@@ -152,11 +160,8 @@ int main(int argc, char *argv[]) {
             try {
                 // Set the URL, send request, and get a result
                 myRequest.setOpt<curlpp::options::Url>(currLink);
-
-                myRequest.setOpt(curlpp::options::UserAgent(std::string(
-                        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0")));
-                myRequest.setOpt(curlpp::options::Cookie(std::string(
-                        "Cookie: __cfduid=dce7d571085ddb5906dd36bb8bfcff9551580944641; ci_session=iRJr2RsPUVUcrzgqyXq6MFYlGuRCY1n8TNBWS8JWB%2BCNiQb752rGMUFI4bj4SmbQh333iG3%2BGcx4zMZa1SLMt0uatOIgBjWgdcXbIrK8GCu5robNWUH1LcY3QyYo0DM43OHa5%2BD%2BkYVTjaB2YfnYlRzBCGkX7B1o4H7jFmKNqpSsyXeL7XfKAg9UzzhHjzGsPt28rQc%2BJacuZj3s30pRKMv9KK9A5HV5VtPqKe955ZEyyvnmVVeTocNy8DZMDIbGScoo0PWD7E0YvyJV5AUxX6P23s%2B83GuBPi0cTcIG2LB%2FBf1YViP8GIUbAtq4luMFYJLLsQOQN03UX3QwCKv6loTj%2FIFwUN%2BBB0zbtxfGtj8VScKycVUgKThQapKR8EhxC%2Fq12QEkl2bXsqWszfW0pXyqEn7sOqZQzjYRy9oDc2w%3D; _ga=GA1.2.257006594.1580944644; _gid=GA1.2.1622360435.1580944644; OB-USER-TOKEN=3c134b0f-d2dd-4220-83e6-430ba7ce9d37; _awl=2.1580945930.0.4-6a365285-a98b5de77a6c926b649cf7751b68ee68-6763652d6575726f70652d7765737431-5e3b520a-1; cf_clearance=38d853a3621b470a742635b1698773e1c3ec0b3b-1580946598-0-150")));
+                myRequest.setOpt(curlpp::options::UserAgent(userAgent));
+                myRequest.setOpt(curlpp::options::Cookie(cookies));
                 //myRequest.setOpt(curlpp::options::Referer(std::string("https://www.readmng.com/dragon-ball/277/1")));
 
                 //myRequest.setOpt(new curlpp::options::FileTime(true));
@@ -168,24 +173,18 @@ int main(int argc, char *argv[]) {
                 myRequest.setOpt(ws);
                 myRequest.perform();
                 std::string htmlCode = htmlStream.str();
-
                 //std::cout << htmlCode << std::endl;
+
                 while (htmlCode.find("Checking your browser before accessing") != std::string::npos) {
                     std::cout << "Handling DDOS protection..." << std::endl;
                     std::cout << "Manually access the website and copy the contents of the cf_clearance cookie"
                               << std::endl;
-                    std::cout << "  On FireFox, F12 > Network. Find the GET request for the page, Right Click > Copy > Copy as cURL. Copy the cookies parameter." << std::endl;
-
-                    // This is not enough to bypass cloudflare... TODO
+                    //std::cout << "  On FireFox, F12 > Network. Find the GET request for the page, "
+                    //             "Right Click > Copy > Copy as cURL. Copy the cookies parameter." << std::endl;
+                    std::cout << "  On FireFox, F12 > Storage. Find your website and select the cf_clearance cookie."
+                               "Copy its value and set as the --ddos parameter." << std::endl;
                     exit(1);
-                    // wait
-                    //sleep(1);
-
-                    //myRequest.perform();
-                    //std::string htmlCode = htmlStream.str();
-
                 }
-                //std::cout << htmlCode << std::endl;
 
                 // check if chapter exists
                 std::string chapterExists;
@@ -213,19 +212,16 @@ int main(int argc, char *argv[]) {
                     imageLink = mangastream_image(htmlCode);
                 else
                     imageLink = readmanga_image(htmlCode, currPage);
-                if (imageLink.empty()){
+                if (imageLink.empty()) {
                     std::cout << "Empty image" << std::endl;
                     break;
                 }
 
-                std::cout << imageLink << std::endl;
+                //std::cout << imageLink << std::endl;
                 myRequestJpg.setOpt<curlpp::options::Url>(imageLink);
 
-                myRequestJpg.setOpt(curlpp::options::UserAgent(std::string(
-                        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0")));
-                myRequestJpg.setOpt(curlpp::options::Cookie(std::string(
-                        "Cookie: __cfduid=dce7d571085ddb5906dd36bb8bfcff9551580944641; ci_session=iRJr2RsPUVUcrzgqyXq6MFYlGuRCY1n8TNBWS8JWB%2BCNiQb752rGMUFI4bj4SmbQh333iG3%2BGcx4zMZa1SLMt0uatOIgBjWgdcXbIrK8GCu5robNWUH1LcY3QyYo0DM43OHa5%2BD%2BkYVTjaB2YfnYlRzBCGkX7B1o4H7jFmKNqpSsyXeL7XfKAg9UzzhHjzGsPt28rQc%2BJacuZj3s30pRKMv9KK9A5HV5VtPqKe955ZEyyvnmVVeTocNy8DZMDIbGScoo0PWD7E0YvyJV5AUxX6P23s%2B83GuBPi0cTcIG2LB%2FBf1YViP8GIUbAtq4luMFYJLLsQOQN03UX3QwCKv6loTj%2FIFwUN%2BBB0zbtxfGtj8VScKycVUgKThQapKR8EhxC%2Fq12QEkl2bXsqWszfW0pXyqEn7sOqZQzjYRy9oDc2w%3D; _ga=GA1.2.257006594.1580944644; _gid=GA1.2.1622360435.1580944644; OB-USER-TOKEN=3c134b0f-d2dd-4220-83e6-430ba7ce9d37; _awl=2.1580945930.0.4-6a365285-a98b5de77a6c926b649cf7751b68ee68-6763652d6575726f70652d7765737431-5e3b520a-1; cf_clearance=38d853a3621b470a742635b1698773e1c3ec0b3b-1580946598-0-150")));
-
+                myRequest.setOpt(curlpp::options::UserAgent(userAgent));
+                myRequest.setOpt(curlpp::options::Cookie(cookies));
 
                 std::ofstream outputFile(chapterDir + std::string(currPageStr) + ".jpg");
                 curlpp::options::WriteStream wsJpg(&outputFile);
@@ -298,109 +294,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
-
     return 0;
-}
-
-
-void zip_directory() {
-    int errorp;
-    zip_t *zipper = zip_open("myzip.zip", ZIP_CREATE | ZIP_EXCL, &errorp);
-    if (zipper == nullptr) {
-        zip_error_t ziperror;
-        zip_error_init_with_code(&ziperror, errorp);
-        std::cout << "Failed to open output file myzip.zip: " << zip_error_strerror(&ziperror) << std::endl;
-    }
-
-    std::string fullname = std::string("/home/david/a");
-    zip_source_t *source = zip_source_file(zipper, fullname.c_str(), 0, 0);
-    if (source == nullptr) {
-        throw std::runtime_error("Failed to add file to zip: " + std::string(zip_strerror(zipper)));
-    }
-    if (zip_file_add(zipper, std::string("a").c_str(), source, ZIP_FL_ENC_UTF_8) < 0) {
-        zip_source_free(source);
-        throw std::runtime_error("Failed to add file to zip: " + std::string(zip_strerror(zipper)));
-    }
-
-    zip_close(zipper);
-}
-
-void test2() {
-
-    float value = 3.14;
-    //std::cin >> value;
-    std::array<int, 3> arr = {9, 8, 7};
-    arr[1] = static_cast<int>(value);
-    std::cout << "Array size = " << arr.size() << std::endl;
-    std::cout << "2nd element = " << arr[1] << std::endl;
-
-    for (int i = 0; i < 5; ++i) {
-        std::cout << "This is silly." << std::endl;
-    }
-
-    int *myIntegerPointer = nullptr;
-    if (!myIntegerPointer) {
-        std::cout << "Empty pointer" << std::endl;
-    }
-    myIntegerPointer = new int;
-    delete myIntegerPointer;
-    myIntegerPointer = nullptr;
-
-    auto myIntegerSmartPointer = std::make_unique<int>(1);
-    std::cout << "Smart pointer " << *myIntegerSmartPointer << std::endl;
-
-    int arraySize = 8;
-    int *myVariableSizedArray = new int[arraySize];
-    delete[] myVariableSizedArray;
-    myVariableSizedArray = nullptr;
-
-    try {
-        Trip myTrip("OPO", "LIS", 2);
-    } catch (const std::invalid_argument &exception) {
-        std::cout << "Error making trip" << std::endl;
-    }
-
-    std::time_t result = std::time(nullptr);
-    std::cout << std::asctime(std::localtime(&result));
-    std::cout << "wat" << std::endl;
-
-}
-
-/*
-void test(){
-    URI uri("http://pocoproject.org/images/front_banner.jpg");
-    std::string path(uri.getPathAndQuery());
-    if (path.empty()) path = "/";
-    HTTPClientSession session(uri.getHost(), uri.getPort());
-    HTTPRequest request(HTTPRequest::HTTP_GET, path, HTTPMessage::HTTP_1_1);
-    HTTPResponse response;
-
-    if (!doRequest(session, request, response))
-    {
-        std::cerr << "Invalid username or password" << std::endl;
-        return 1;
-    }
-}
-
-bool doRequest(Poco::Net::HTTPClientSession& session, Poco::Net::HTTPRequest& request,              Poco::Net::HTTPResponse& response)
-{
-    session.sendRequest(request);
-    std::istream& rs = session.receiveResponse(response);
-    std::cout << response.getStatus() << " " << response.getReason() << std::endl;
-    if (response.getStatus() != Poco::Net::HTTPResponse::HTTP_UNAUTHORIZED)
-    {
-        std::ofstream ofs("Poco_banner.jpg",std::fstream::binary);
-        StreamCopier::copyStream(rs, ofs);
-        return true;
-    }
-    else
-    {
-        //it went wrong ?
-        return false;
-    }
-}*/
-
-void mysteryFunction(const int *ptrToImmutableVal, int &referenceToVal, const int &referenceToImmutableVal) {
-    referenceToVal = 1;
-    throw std::invalid_argument("Denominator cannot be 0.");
 }
