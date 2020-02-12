@@ -19,66 +19,20 @@
 #else
 
 #include <experimental/string_view>
+#include "ReadmngParser.h"
+#include "MangastreamParser.h"
 
 #define std_literals std::experimental::literals
 #endif
 
 using namespace std_literals;
 
-
-std::string ReplaceAll(std::string str, const std::string &from, const std::string &to) {
-    size_t start_pos = 0;
-    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-        str.replace(start_pos, from.length(), to);
-        start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
-    }
-    return str;
-}
-
-std::string mangastream_image(std::string &htmlCode) {
-    // Use regex to get image URL
-    std::regex imageLinkRegex("src=.*?\\.jpg");
-    std::smatch imageLinkMatch;
-    if (not std::regex_search(htmlCode, imageLinkMatch, imageLinkRegex)) {
-        return "";
-    }
-
-    // Get and save image
-    std::string imageLink = imageLinkMatch[0].str().substr(5);
-
-    return imageLink;
-}
-
-std::string readmanga_image(std::string &htmlCode, uint16_t &currPage) {
-    //std::cout << htmlCode << std::endl;
-
-    char *currPageStr = new char[25];
-    sprintf(currPageStr, "%d,\"url\":\".*%05d\\....", currPage - 1, currPage);
-    //std::cout << currPageStr << std::endl;
-
-    // Use regex to get image URL
-    std::regex imageLinkRegex(currPageStr);
-    std::smatch imageLinkMatch;
-    if (not std::regex_search(htmlCode, imageLinkMatch, imageLinkRegex)) {
-        return "";
-    }
-
-    // Get and save image
-    std::string imageLink = imageLinkMatch[0].str();
-    imageLink = imageLink.substr(imageLink.find("h"));
-    imageLink = ReplaceAll(imageLink, "\\", "");
-    std::cout << imageLink << std::endl;
-
-    return imageLink;
-}
-
-
 void showHelp() {
     std::cout << "Please provide a MangaReader or ReadManga address:" << std::endl;
-    std::cout << "\thttps://www.mangareader.net/soul-eater" << std::endl;
+    std::cout << "\thttp://www.mangareader.net/soul-eater" << std::endl;
     std::cout << "\thttps://www.readmng.com/dragon-ball" << std::endl;
-    std::cout << "Example usage: Trawler https://www.mangareader.net/soul-eater "
-              << "[--no-compress] [--start 1] [--end 100] [--save /tmp]" << std::endl;
+    std::cout << "Example usage: Trawler http://www.mangareader.net/soul-eater "
+              << "[--no-compress] [--start 1] [--end 100] [--save /tmp] [--ddos cookie-value]" << std::endl;
 }
 
 
@@ -125,6 +79,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    std::unique_ptr<SiteParser> myParser;
+    if(mangareader_link){
+        myParser = std::make_unique<MangastreamParser>();
+    }else{
+        myParser = std::make_unique<ReadmngParser>();
+    }
+
     std::string cookies {"Cookie: __cfduid=dce7d571085ddb5906dd36bb8bfcff9551580944641; "
             "ci_session=iRJr2RsPUVUcrzgqyXq6MFYlGuRCY1n8TNBWS8JWB%2BCNiQb752rGMUFI4bj4SmbQh333iG3%2BGcx4zMZa1SLMt0uatOIgBjWgdcXbIrK8GCu5robNWUH1LcY3QyYo0DM43OHa5%2BD%2BkYVTjaB2YfnYlRzBCGkX7B1o4H7jFmKNqpSsyXeL7XfKAg9UzzhHjzGsPt28rQc%2BJacuZj3s30pRKMv9KK9A5HV5VtPqKe955ZEyyvnmVVeTocNy8DZMDIbGScoo0PWD7E0YvyJV5AUxX6P23s%2B83GuBPi0cTcIG2LB%2FBf1YViP8GIUbAtq4luMFYJLLsQOQN03UX3QwCKv6loTj%2FIFwUN%2BBB0zbtxfGtj8VScKycVUgKThQapKR8EhxC%2Fq12QEkl2bXsqWszfW0pXyqEn7sOqZQzjYRy9oDc2w%3D; "
             "_ga=GA1.2.257006594.1580944644; "
@@ -162,11 +123,6 @@ int main(int argc, char *argv[]) {
                 myRequest.setOpt<curlpp::options::Url>(currLink);
                 myRequest.setOpt(curlpp::options::UserAgent(userAgent));
                 myRequest.setOpt(curlpp::options::Cookie(cookies));
-                //myRequest.setOpt(curlpp::options::Referer(std::string("https://www.readmng.com/dragon-ball/277/1")));
-
-                //myRequest.setOpt(new curlpp::options::FileTime(true));
-                //myRequest.setOpt(new curlpp::options::Verbose(true));
-
 
                 std::ostringstream htmlStream;
                 curlpp::options::WriteStream ws(&htmlStream);
@@ -179,55 +135,45 @@ int main(int argc, char *argv[]) {
                     std::cout << "Handling DDOS protection..." << std::endl;
                     std::cout << "Manually access the website and copy the contents of the cf_clearance cookie"
                               << std::endl;
-                    //std::cout << "  On FireFox, F12 > Network. Find the GET request for the page, "
-                    //             "Right Click > Copy > Copy as cURL. Copy the cookies parameter." << std::endl;
                     std::cout << "  On FireFox, F12 > Storage. Find your website and select the cf_clearance cookie."
                                "Copy its value and set as the --ddos parameter." << std::endl;
                     exit(1);
                 }
 
                 // check if chapter exists
-                std::string chapterExists;
-                if (mangareader_link) {
-                    chapterExists = std::string("is not released yet.");
-                } else {
-                    chapterExists = std::string("is not available yet.");
-                }
-                if (htmlCode.find(chapterExists) != std::string::npos) {
+                if (!myParser->chapterExists(htmlCode)) {
                     // delete created folder
                     boost::filesystem::remove(chapterDir);
                     endChapter = currChapter;
                     //std::cout << "Chapter unavailable" << std::endl;
-                    //break;
+                    break;
                 }
-
 
                 // format page numbers
                 char *currPageStr = new char[4];
                 sprintf(currPageStr, "%03d", currPage);
 
                 // Get and save image
-                std::string imageLink;
-                if (mangareader_link)
-                    imageLink = mangastream_image(htmlCode);
-                else
-                    imageLink = readmanga_image(htmlCode, currPage);
+                std::string imageLink = myParser->getImageLink(htmlCode, currPage);
                 if (imageLink.empty()) {
                     std::cout << "Empty image" << std::endl;
                     break;
                 }
 
-                //std::cout << imageLink << std::endl;
+                std::cout << imageLink << std::endl;
                 myRequestJpg.setOpt<curlpp::options::Url>(imageLink);
-
-                myRequest.setOpt(curlpp::options::UserAgent(userAgent));
-                myRequest.setOpt(curlpp::options::Cookie(cookies));
+                myRequestJpg.setOpt(curlpp::options::UserAgent(userAgent));
+                myRequestJpg.setOpt(curlpp::options::Cookie(cookies));
 
                 std::ofstream outputFile(chapterDir + std::string(currPageStr) + ".jpg");
                 curlpp::options::WriteStream wsJpg(&outputFile);
                 myRequestJpg.setOpt(wsJpg);
+                //curlpp::options::WriteStream wsdebug(&htmlStream);
+                //myRequestJpg.setOpt(wsdebug);
+                //std::cout << htmlStream.str() << std::endl;
                 myRequestJpg.perform();
                 outputFile.close();
+                //exit(1);
             } catch (curlpp::RuntimeError &e) {
                 std::cerr << e.what() << std::endl;
             } catch (curlpp::LogicError &e) {

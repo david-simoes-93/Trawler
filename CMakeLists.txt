@@ -4,7 +4,7 @@ project(Trawler)
 set(CMAKE_CXX_STANDARD 14)
 find_package(Boost COMPONENTS system filesystem REQUIRED)
 
-set(SOURCE_FILES main.cpp)
+set(SOURCE_FILES main.cpp SiteParser.h ReadmngParser.h ReadmngParser.cpp MangastreamParser.h MangastreamParser.cpp)
 add_executable(Trawler ${SOURCE_FILES})
 
 find_library(LCURLPP curlpp lib)
