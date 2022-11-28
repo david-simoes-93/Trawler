@@ -1,4 +1,8 @@
-A manga crawler from MangaReader.
+A manga crawler from MangaReader and ReadMng.
+
+You might need to install dependencies:
+
+    sudo apt-get install libboost-system-dev libboost-filesystem-dev libzip-dev libcurlpp-dev libcurl4-nss-dev
 
 To build
 
